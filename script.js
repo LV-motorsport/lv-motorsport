@@ -147,7 +147,7 @@ async function submitForm() {
       document.getElementById('fqty').value = '';
       document.getElementById('fbudget').value = '';
     } else {
-      alert('Erreur lors de l'envoi. Réessayez ou contactez directement par email.');
+      alert("Erreur lors de l'envoi. Réessayez ou contactez directement par email.");
     }
   } catch(e) {
     alert('Erreur réseau. Vérifiez votre connexion.');
