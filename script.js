@@ -119,17 +119,42 @@ function qsend(txt) {
 }
 
 /* ===== FORM ===== */
-function submitForm() {
+async function submitForm() {
   const name = document.getElementById('fname').value.trim();
   const email = document.getElementById('femail').value.trim();
   const desc = document.getElementById('fdesc').value.trim();
+  const product = document.getElementById('fproduct').value;
+  const qty = document.getElementById('fqty').value;
+  const budget = document.getElementById('fbudget').value;
   if (!name || !email || !desc) { alert('Veuillez remplir les champs obligatoires.'); return; }
-  const sm = document.getElementById('successMsg');
-  sm.style.display = 'block';
-  setTimeout(() => sm.style.display = 'none', 5000);
-  document.getElementById('fname').value = '';
-  document.getElementById('femail').value = '';
-  document.getElementById('fdesc').value = '';
+  const btn = document.querySelector('.submit-btn');
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Envoi en cours...';
+  try {
+    const res = await fetch('https://formspree.io/f/xeenkwvn', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify({ name, email, product, quantity: qty, budget, message: desc })
+    });
+    if (res.ok) {
+      const sm = document.getElementById('successMsg');
+      sm.style.display = 'block';
+      setTimeout(() => sm.style.display = 'none', 6000);
+      document.getElementById('fname').value = '';
+      document.getElementById('femail').value = '';
+      document.getElementById('fdesc').value = '';
+      document.getElementById('fqty').value = '';
+      document.getElementById('fbudget').value = '';
+    } else {
+      alert('Erreur lors de l'envoi. Réessayez ou contactez directement par email.');
+    }
+  } catch(e) {
+    alert('Erreur réseau. Vérifiez votre connexion.');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalText;
+  }
 }
 
 /* ===== SCROLL REVEAL ===== */
