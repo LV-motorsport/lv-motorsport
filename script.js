@@ -270,9 +270,9 @@ function initGalleryViewers() {
   }
 
   const models = [
-    { id: 'gv-trophe-gold', file: './trophe_gold.glb', color: null },
-    { id: 'gv-trophe-bi',   file: './trophe_bicolor.glb', color: null },
-    { id: 'gv-logo-rmt',    file: './logo_rmt.glb', color: null },
+    { id: 'gv-trophe-gold', file: './trophe_gold.glb', bgColor: 0x1A1A1A, forceColor: 0xC9A84C, metalness: 0.9, roughness: 0.1 },
+    { id: 'gv-trophe-bi',   file: './trophe_bicolor.glb', bgColor: 0x1A1A1A, forceColor: 0xC9A84C, metalness: 0.9, roughness: 0.1 },
+    { id: 'gv-logo-rmt',    file: './logo_rmt.glb', bgColor: 0xF0EDE8, forceColor: 0x222222, metalness: 0.0, roughness: 0.7 },
   ];
 
   models.forEach(function(model) {
@@ -290,16 +290,17 @@ function initGalleryViewers() {
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
     renderer.setSize(W, H);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setClearColor(0x080808, 1);
+    renderer.setClearColor(model.bgColor, 1);
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
     camera.position.set(0, 0, 8);
     camera.lookAt(0, 0, 0);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 2.0));
-    const dl = new THREE.DirectionalLight(0xffd700, 2.0); dl.position.set(3, 5, 5); scene.add(dl);
-    const dl2 = new THREE.DirectionalLight(0xC0392B, 0.8); dl2.position.set(-3, -2, 3); scene.add(dl2);
+    scene.add(new THREE.AmbientLight(0xffffff, 2.5));
+    const dl = new THREE.DirectionalLight(0xffffff, 2.0); dl.position.set(3, 5, 5); scene.add(dl);
+    const dl2 = new THREE.DirectionalLight(0xffffff, 1.0); dl2.position.set(-3, 2, 3); scene.add(dl2);
+    const dl3 = new THREE.DirectionalLight(0xffffff, 0.8); dl3.position.set(0, -3, 3); scene.add(dl3);
 
     let mesh = null, rotY = 0, rotX = 0, dragging = false, lastX = 0, lastY = 0;
 
@@ -315,7 +316,19 @@ function initGalleryViewers() {
       const c2 = box2.getCenter(new THREE.Vector3());
       mesh.position.set(-c2.x, -c2.y, -c2.z);
       mesh.traverse(function(ch) {
-        if (ch.isMesh) { ch.material.metalness = 0.85; ch.material.roughness = 0.12; ch.material.needsUpdate = true; }
+        if (ch.isMesh) {
+          if (model.forceColor) {
+            ch.material = new THREE.MeshStandardMaterial({
+              color: model.forceColor,
+              metalness: model.metalness,
+              roughness: model.roughness
+            });
+          } else {
+            ch.material.metalness = 0.85;
+            ch.material.roughness = 0.12;
+            ch.material.needsUpdate = true;
+          }
+        }
       });
       scene.add(mesh);
     }, undefined, function(e) { console.warn('GLB error ' + model.id + ':', e); });
