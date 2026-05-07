@@ -270,9 +270,9 @@ function initGalleryViewers() {
   }
 
   const models = [
-    { id: 'gv-trophe-gold', file: './trophe_gold.glb', bgColor: 0x1A1A1A, forceColor: 0xC9A84C, metalness: 0.9, roughness: 0.1 },
-    { id: 'gv-trophe-bi',   file: './trophe_bicolor.glb', bgColor: 0x1A1A1A, forceColor: 0xC9A84C, metalness: 0.9, roughness: 0.1 },
-    { id: 'gv-logo-rmt',    file: './logo_rmt.glb', bgColor: 0xF0EDE8, forceColor: 0x222222, metalness: 0.0, roughness: 0.7 },
+    { id: 'gv-trophe-gold',  file: './trophe_gold.glb',    bgColor: 0x1C1C1C },
+    { id: 'gv-trophe-bi',    file: './trophe_bicolor.glb', bgColor: 0x1C1C1C },
+    { id: 'gv-logo-rmt',     file: './logo_rmt.glb',       bgColor: 0xEEEBE6 },
   ];
 
   models.forEach(function(model) {
@@ -317,17 +317,7 @@ function initGalleryViewers() {
       mesh.position.set(-c2.x, -c2.y, -c2.z);
       mesh.traverse(function(ch) {
         if (ch.isMesh) {
-          if (model.forceColor) {
-            ch.material = new THREE.MeshStandardMaterial({
-              color: model.forceColor,
-              metalness: model.metalness,
-              roughness: model.roughness
-            });
-          } else {
-            ch.material.metalness = 0.85;
-            ch.material.roughness = 0.12;
-            ch.material.needsUpdate = true;
-          }
+          ch.material.needsUpdate = true;
         }
       });
       scene.add(mesh);
