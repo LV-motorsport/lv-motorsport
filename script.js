@@ -323,8 +323,9 @@ function initGalleryViewers() {
     canvas.style.cursor = 'grab';
     canvas.addEventListener('click', function(e) { e.stopPropagation(); });
     canvas.addEventListener('mousedown', function(e) { e.stopPropagation(); dragging = true; lastX = e.clientX; lastY = e.clientY; canvas.style.cursor = 'grabbing'; });
-    window.addEventListener('mouseup', function() { dragging = false; canvas.style.cursor = 'grab'; });
-    window.addEventListener('mousemove', function(e) {
+    canvas.addEventListener('mouseup', function() { dragging = false; canvas.style.cursor = 'grab'; });
+    canvas.addEventListener('mouseleave', function() { dragging = false; canvas.style.cursor = 'grab'; });
+    canvas.addEventListener('mousemove', function(e) {
       if (!dragging) return;
       rotY += (e.clientX - lastX) * 0.01;
       rotX += (e.clientY - lastY) * 0.01;
@@ -432,13 +433,14 @@ setTimeout(initGalleryViewers, 800);
 let viewerRenderer, viewerScene, viewerCamera, viewerControls, viewerRAF;
 let currentViewerModel = null;
 
-function openViewer(modelName, matLabel) {
+function openViewer(modelName, matLabel, glbPath) {
   document.getElementById('viewerOverlay').classList.add('open');
   document.getElementById('viewerTitleText').textContent = modelName;
   document.getElementById('viewerMatTag').textContent = matLabel;
   document.body.style.overflow = 'hidden';
+  window._currentViewerGLB = glbPath || null;
   if (!viewerRenderer) initViewerRenderer();
-  else if (currentViewerModel) loadDefaultModel(modelName);
+  else loadDefaultModel(modelName, glbPath || null);
 }
 
 function closeViewer() {
@@ -469,9 +471,13 @@ function initViewerRenderer() {
   // OrbitControls (manual implementation — no import needed)
   setupOrbitControls(canvas);
   // Load default trophy
-  currentViewerModel = buildTrophy3D(0xC9A84C);
-  currentViewerModel.scale.set(1.5,1.5,1.5);
-  viewerScene.add(currentViewerModel);
+  if (window._currentViewerGLB) {
+    loadGLBIntoViewer(window._currentViewerGLB);
+  } else {
+    currentViewerModel = buildTrophy3D(0xC9A84C);
+    currentViewerModel.scale.set(1.5,1.5,1.5);
+    viewerScene.add(currentViewerModel);
+  }
   animateViewer();
   window.addEventListener('resize', resizeViewer);
 }
@@ -511,27 +517,32 @@ function loadGLBLogo(onLoaded) {
   }, undefined, e => { console.warn('GLB viewer error:', e); onLoaded(null); });
 }
 
-function loadDefaultModel(name) {
+function loadGLBIntoViewer(glbPath) {
+  if (currentViewerModel) { viewerScene.remove(currentViewerModel); currentViewerModel = null; }
+  if (!THREE.GLTFLoader) return;
+  new THREE.GLTFLoader().load(glbPath, function(gltf) {
+    currentViewerModel = gltf.scene;
+    const box = new THREE.Box3().setFromObject(currentViewerModel);
+    const c = box.getCenter(new THREE.Vector3());
+    const sz = box.getSize(new THREE.Vector3());
+    const sf = 3.0 / Math.max(sz.x, sz.y, sz.z);
+    currentViewerModel.position.set(0,0,0);
+    currentViewerModel.scale.set(sf,sf,sf);
+    const box2 = new THREE.Box3().setFromObject(currentViewerModel);
+    const c2 = box2.getCenter(new THREE.Vector3());
+    currentViewerModel.position.set(-c2.x,-c2.y,-c2.z);
+    currentViewerModel.traverse(ch => {
+      if(ch.isMesh){ ch.material.metalness=0.85; ch.material.roughness=0.12; ch.material.needsUpdate=true; }
+    });
+    viewerScene.add(currentViewerModel);
+  }, undefined, e => console.warn('Viewer GLB error:', e));
+}
+
+function loadDefaultModel(name, glbPath) {
+  if (glbPath) { loadGLBIntoViewer(glbPath); return; }
   if (currentViewerModel) { viewerScene.remove(currentViewerModel); currentViewerModel = null; }
   const n = name.toLowerCase();
-
-  if (n.includes('logo') || n.includes('relief') || n.includes('déco') || n.includes('deco') || n.includes('signalétique') || n.includes('signaletique') || n.includes('mascotte') || n.includes('plaque')) {
-    // Load real GLB logo
-    loadGLBLogo(model => {
-      if (model) {
-        currentViewerModel = model;
-        viewerScene.add(currentViewerModel);
-      } else {
-        // Fallback
-        currentViewerModel = buildTrophy3D(0xC0392B);
-        currentViewerModel.scale.set(1.5,1.5,1.5);
-        viewerScene.add(currentViewerModel);
-      }
-    });
-    return;
-  }
-
-  if (n.includes('trophée') || n.includes('trophy')) {
+  if (n.includes('trophée') || n.includes('trophy') || n.includes('rmt') || n.includes('gold') || n.includes('or')) {
     currentViewerModel = buildTrophy3D(0xC9A84C);
   } else if (n.includes('sim') || n.includes('bouton') || n.includes('button')) {
     currentViewerModel = buildBox3D(0x1A1A1A);
