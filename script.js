@@ -265,137 +265,105 @@ document.addEventListener('DOMContentLoaded', triggerReveal);
 /* ===== GALLERY MINI-VIEWERS ===== */
 // Called after Three.js loads. Builds small rotating previews in gallery cards.
 function initGalleryViewers() {
-  if (typeof THREE === 'undefined' || typeof THREE.GLTFLoader === 'undefined' || !window._LV_GLB_URL) {
-    setTimeout(initGalleryViewers, 300);
-    return;
+  if (typeof THREE === 'undefined' || typeof THREE.GLTFLoader === 'undefined') {
+    setTimeout(initGalleryViewers, 300); return;
   }
 
-  const wrap = document.getElementById('gv-logo');
-  if (!wrap) return;
-  // Prevent double init
-  if (wrap.dataset.initialized) return;
-  wrap.dataset.initialized = 'true';
+  const models = [
+    { id: 'gv-trophe-gold', file: './trophe_gold.glb', color: null },
+    { id: 'gv-trophe-bi',   file: './trophe_bicolor.glb', color: null },
+    { id: 'gv-logo-rmt',    file: './logo_rmt.glb', color: null },
+  ];
 
-  const canvas = document.createElement('canvas');
-  canvas.width = wrap.clientWidth || 480;
-  canvas.height = wrap.clientHeight || 400;
-  canvas.style.width = '100%';
-  canvas.style.height = '100%';
-  wrap.appendChild(canvas);
+  models.forEach(function(model) {
+    const wrap = document.getElementById(model.id);
+    if (!wrap || wrap.dataset.initialized) return;
+    wrap.dataset.initialized = 'true';
 
-  const W = canvas.width, H = canvas.height;
+    const canvas = document.createElement('canvas');
+    canvas.width = wrap.clientWidth || 480;
+    canvas.height = wrap.clientHeight || 400;
+    canvas.style.width = '100%'; canvas.style.height = '100%';
+    wrap.appendChild(canvas);
 
-  window._gScene = new THREE.Scene();
-  window._gCamera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
-  window._gCamera.position.set(0, 0, 8);
-  window._gCamera.lookAt(0, 0, 0);
+    const W = canvas.width, H = canvas.height;
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer.setSize(W, H);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x080808, 1);
 
-  window._gRenderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
-  window._gRenderer.setSize(W, H);
-  window._gRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  window._gRenderer.setClearColor(0x080808, 1);
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(45, W / H, 0.1, 100);
+    camera.position.set(0, 0, 8);
+    camera.lookAt(0, 0, 0);
 
-  window._gScene.add(new THREE.AmbientLight(0xffffff, 3.0));
-  const dl = new THREE.DirectionalLight(0xffffff, 3.0);
-  dl.position.set(0, 0, 5);
-  window._gScene.add(dl);
-  const dl2 = new THREE.DirectionalLight(0xC0392B, 1.5);
-  dl2.position.set(-3, 2, 3);
-  window._gScene.add(dl2);
+    scene.add(new THREE.AmbientLight(0xffffff, 2.0));
+    const dl = new THREE.DirectionalLight(0xffd700, 2.0); dl.position.set(3, 5, 5); scene.add(dl);
+    const dl2 = new THREE.DirectionalLight(0xC0392B, 0.8); dl2.position.set(-3, -2, 3); scene.add(dl2);
 
-  window._gMesh = null;
-  window._gT = 0;
+    let mesh = null, rotY = 0, rotX = 0, dragging = false, lastX = 0, lastY = 0;
 
-  new THREE.GLTFLoader().load(window._LV_GLB_URL,
-    function(gltf) {
-      window._gMesh = gltf.scene;
-      const box = new THREE.Box3().setFromObject(window._gMesh);
+    new THREE.GLTFLoader().load(model.file, function(gltf) {
+      mesh = gltf.scene;
+      const box = new THREE.Box3().setFromObject(mesh);
       const center = box.getCenter(new THREE.Vector3());
       const size = box.getSize(new THREE.Vector3());
-      const sf = 2.0 / Math.max(size.x, size.y, size.z);
-      // Reset position first, then center properly
-      window._gMesh.position.set(0, 0, 0);
-      window._gMesh.scale.set(sf, sf, sf);
-      // Recompute after scale
-      const box2 = new THREE.Box3().setFromObject(window._gMesh);
-      const center2 = box2.getCenter(new THREE.Vector3());
-      window._gMesh.position.set(-center2.x, -center2.y, -center2.z);
-      window._gMesh.traverse(function(ch) {
-        if (ch.isMesh) {
-          ch.material.metalness = 0.8;
-          ch.material.roughness = 0.15;
-          ch.material.needsUpdate = true;
-        }
+      const sf = 3.0 / Math.max(size.x, size.y, size.z);
+      mesh.position.set(0, 0, 0);
+      mesh.scale.set(sf, sf, sf);
+      const box2 = new THREE.Box3().setFromObject(mesh);
+      const c2 = box2.getCenter(new THREE.Vector3());
+      mesh.position.set(-c2.x, -c2.y, -c2.z);
+      mesh.traverse(function(ch) {
+        if (ch.isMesh) { ch.material.metalness = 0.85; ch.material.roughness = 0.12; ch.material.needsUpdate = true; }
       });
-      window._gScene.add(window._gMesh);
-      console.log('Gallery mesh added to scene, children:', window._gScene.children.length);
-    },
-    undefined,
-    function(err) { console.error('Gallery GLB load error:', err); }
-  );
+      scene.add(mesh);
+    }, undefined, function(e) { console.warn('GLB error ' + model.id + ':', e); });
 
-  // Mouse/touch interaction
-  let _gDragging = false, _gLastX = 0, _gLastY = 0, _gRotX = 0, _gRotY = 0;
-
-  canvas.addEventListener('mousedown', function(e) {
-    _gDragging = true; _gLastX = e.clientX; _gLastY = e.clientY;
-    canvas.style.cursor = 'grabbing';
-  });
-  window.addEventListener('mouseup', function() {
-    _gDragging = false;
     canvas.style.cursor = 'grab';
+    canvas.addEventListener('click', function(e) { e.stopPropagation(); });
+    canvas.addEventListener('mousedown', function(e) { e.stopPropagation(); dragging = true; lastX = e.clientX; lastY = e.clientY; canvas.style.cursor = 'grabbing'; });
+    window.addEventListener('mouseup', function() { dragging = false; canvas.style.cursor = 'grab'; });
+    window.addEventListener('mousemove', function(e) {
+      if (!dragging) return;
+      rotY += (e.clientX - lastX) * 0.01;
+      rotX += (e.clientY - lastY) * 0.01;
+      rotX = Math.max(-1.0, Math.min(1.0, rotX));
+      lastX = e.clientX; lastY = e.clientY;
+    });
+    canvas.addEventListener('touchstart', function(e) { lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; });
+    canvas.addEventListener('touchmove', function(e) {
+      rotY += (e.touches[0].clientX - lastX) * 0.01;
+      rotX += (e.touches[0].clientY - lastY) * 0.01;
+      lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+      e.preventDefault();
+    }, { passive: false });
+
+    const hint = document.createElement('p');
+    hint.textContent = 'Glisser pour pivoter';
+    hint.style.cssText = 'text-align:center;font-size:11px;color:#555;margin:4px 0 0;letter-spacing:1px;font-family:Barlow Condensed,sans-serif;text-transform:uppercase';
+    wrap.insertAdjacentElement('afterend', hint);
+
+    (function loop() {
+      requestAnimationFrame(loop);
+      if (mesh) { mesh.rotation.y = rotY; mesh.rotation.x = rotX; }
+      renderer.render(scene, camera);
+    })();
   });
-  window.addEventListener('mousemove', function(e) {
-    if (!_gDragging) return;
-    _gRotY += (e.clientX - _gLastX) * 0.01;
-    _gRotX += (e.clientY - _gLastY) * 0.01;
-    _gRotX = Math.max(-1.0, Math.min(1.0, _gRotX));
-    _gLastX = e.clientX; _gLastY = e.clientY;
-  });
-  canvas.addEventListener('touchstart', function(e) {
-    _gLastX = e.touches[0].clientX; _gLastY = e.touches[0].clientY;
-  });
-  canvas.addEventListener('touchmove', function(e) {
-    _gRotY += (e.touches[0].clientX - _gLastX) * 0.01;
-    _gRotX += (e.touches[0].clientY - _gLastY) * 0.01;
-    _gLastX = e.touches[0].clientX; _gLastY = e.touches[0].clientY;
-    e.preventDefault();
-  }, { passive: false });
 
-  canvas.style.cursor = 'grab';
-  // Prevent canvas clicks from opening the viewer
-  canvas.addEventListener('click', function(e) { e.stopPropagation(); });
-  canvas.addEventListener('mousedown', function(e) { e.stopPropagation(); });
-
-  // Hint text
-  const hint = document.createElement('p');
-  hint.textContent = 'Cliquer + glisser pour pivoter';
-  hint.style.cssText = 'text-align:center;font-size:11px;color:#666;margin:6px 0 0;letter-spacing:1px;font-family:Barlow Condensed,sans-serif;text-transform:uppercase';
-  wrap.parentElement && wrap.parentElement.appendChild && wrap.insertAdjacentElement('afterend', hint);
-
-  function gLoop() {
-    requestAnimationFrame(gLoop);
-    if (window._gMesh) {
-      window._gMesh.rotation.y = _gRotY;
-      window._gMesh.rotation.x = _gRotX;
-    }
-    window._gRenderer.render(window._gScene, window._gCamera);
-  }
-  gLoop();
-
-  // Also update viewer to use GLB for logo products
+  // Keep _loadLogoGLB for viewer compatibility
   window._loadLogoGLB = function(scene, cb) {
-    new THREE.GLTFLoader().load(window._LV_GLB_URL, function(gltf) {
+    new THREE.GLTFLoader().load('./logo_rmt.glb', function(gltf) {
       const m = gltf.scene;
       const box = new THREE.Box3().setFromObject(m);
       const c = box.getCenter(new THREE.Vector3());
       const sz = box.getSize(new THREE.Vector3());
       const sf = 2.5 / Math.max(sz.x, sz.y, sz.z);
       m.position.sub(c); m.scale.set(sf, sf, sf);
-      m.traverse(function(ch) { if(ch.isMesh){ ch.material.metalness=0.8; ch.material.roughness=0.15; } });
+      m.traverse(ch => { if(ch.isMesh){ ch.material.metalness=0.85; ch.material.roughness=0.12; } });
       scene.add(m);
       if(cb) cb(m);
-    }, undefined, function(e) { if(cb) cb(null); });
+    }, undefined, e => { if(cb) cb(null); });
   };
 }
 
